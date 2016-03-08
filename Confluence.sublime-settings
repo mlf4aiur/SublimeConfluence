@@ -1,0 +1,24 @@
+/*
+    Confluence default settings
+*/
+{
+    /*
+        Sets the Confluence REST url base
+    */
+    "base_uri": "https://confluence.example.com/confluence/rest/api",
+
+    /*
+        Sets the default Confluence space
+    */
+    "default_space_key": null,
+
+    /*
+        Sets the Confluence username
+    */
+    "username": null,
+
+    /*
+        Sets the Confluence password
+    */
+    "password": null
+}

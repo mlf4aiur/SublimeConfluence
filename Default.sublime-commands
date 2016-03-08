@@ -1,0 +1,18 @@
+[
+    {
+        "caption": "Confluence: Post Confluence Page",
+        "command": "post_confluence_page"
+    },
+    {
+        "caption": "Confluence: Get Confluence Page",
+        "command": "get_confluence_page"
+    },
+    {
+        "caption": "Confluence: Update Confluence Page",
+        "command": "update_confluence_page"
+    },
+    {
+        "caption": "Confluence: Delete Confluence Page",
+        "command": "delete_confluence_page"
+    }
+]
