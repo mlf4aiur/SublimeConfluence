@@ -1,4 +1,3 @@
-# from urlparse import urljoin
 import json
 import os
 import re
@@ -27,9 +26,10 @@ class ConfluenceApi(object):
         self.base_uri = base_uri
         self.session = requests.Session()
         self.session.auth = requests.auth.HTTPBasicAuth(self.username, self.password)
+        print("ConfluenceApi username: {}, password: {}, base_uri: {}".format(
+            self.username, "*" * len(self.password), self.base_uri))
 
     def _request(self, method, sub_uri, params=None, **kwargs):
-        # url = urljoin(self.base_uri, sub_uri)
         url = "{}/{}".format(self.base_uri, sub_uri)
         headers = {"Content-Type": "application/json"}
         if params:
@@ -57,7 +57,7 @@ class ConfluenceApi(object):
         cql = "type=page AND space={} AND title~{}".format(space_key, title)
         params = {"cql": cql}
         response = self._get("content/search", params=params)
-        return response.json()["results"]
+        return response
 
     def get_content_by_id(self, content_id):
         response = self._get(
@@ -68,7 +68,7 @@ class ConfluenceApi(object):
         cql = "type=page AND space={} AND title={}".format(space_key, title)
         params = {"cql": cql}
         response = self._get("content/search", params=params)
-        return response.json()["results"][0]
+        return response
 
     def get_content_history(self, content_id):
         return self._get("content/{}/history".format(content_id))
@@ -181,6 +181,7 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
             self.MSG_PASSWORD, "", self.on_done_password, self.on_change_password, None)
 
     def on_done_username_password(self, value):
+        self.username = value
         sublime.status_message("Waiting for password")
         sublime.set_timeout(self.get_password, 50)
 
@@ -207,7 +208,7 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
 
     def on_change_password(self, value):
         # Known issue
-        # It will get incorrect password when user modify the password inline
+        # It can not get correct password when user modify the password inline
         if value != self.hidden_string:
             if len(value) < len(self.password):
                 self.password = self.password[:len(value)]
@@ -239,15 +240,20 @@ class PostConfluencePageCommand(BaseConfluencePageCommand):
         if not new_content:
             return
         self.build_confluence_api()
-        ancestor = self.confluence_api.get_content_by_title(
+        response = self.confluence_api.get_content_by_title(
             meta["space_key"], meta["ancestor_title"])
-        ancestor_id = int(ancestor["id"])
-        space = dict(key=meta["space_key"])
-        new_content = "<p>This is a new page</p>"
-        body = dict(storage=dict(value=new_content, representation="storage"))
-        data = dict(type="page", title=meta["title"], ancestors=[dict(id=ancestor_id)],
-                    space=space, body=body)
-        self.confluence_api.create_content(data)
+        if response.ok:
+            ancestor = response.json()["results"][0]
+            ancestor_id = int(ancestor["id"])
+            space = dict(key=meta["space_key"])
+            new_content = "<p>This is a new page</p>"
+            body = dict(storage=dict(value=new_content, representation="storage"))
+            data = dict(type="page", title=meta["title"], ancestors=[dict(id=ancestor_id)],
+                        space=space, body=body)
+            self.confluence_api.create_content(data)
+        else:
+            print(response.text)
+            sublime.error_message("Can not get ancestor, reason: {}".format(response.reason))
 
 
 class GetConfluencePageCommand(BaseConfluencePageCommand):
@@ -260,6 +266,7 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
     def run(self, edit):
         super(GetConfluencePageCommand, self).run(edit)
         self.build_confluence_api()
+        sublime.status_message("Waiting for page title")
         sublime.set_timeout(self.get_space_key_and_page_title, 50)
 
     def get_space_key_and_page_title(self):
@@ -274,8 +281,18 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
             sublime.status_message("Waiting for space key")
             sublime.set_timeout(self.get_space_key, 50)
         else:
+            self.space_key = self.default_space_key
             sublime.status_message("Waiting for page title")
             sublime.set_timeout(self.get_page_title, 50)
+
+    def on_done_password(self, value):
+        print("on_done_password")
+        super(GetConfluencePageCommand, self).on_done_password(value)
+        if not self.password.strip():
+            sublime.status_message("No password provided")
+        else:
+            self.password = value
+            sublime.set_timeout(self.get_space_key_and_page_title, 50)
 
     def get_space_key(self):
         self.view.window().show_input_panel(
@@ -295,9 +312,17 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
         sublime.set_timeout(self.get_pages, 50)
 
     def get_pages(self):
-        self.pages = self.confluence_api.search_content(self.space_key, self.page_title)
-        packed_pages = [page["title"] for page in self.pages]
-        self.view.window().show_quick_panel(packed_pages, self.on_done_pages)
+        response = self.confluence_api.search_content(self.space_key, self.page_title)
+        if response.ok:
+            self.pages = response.json()["results"]
+            packed_pages = [page["title"] for page in self.pages]
+            if packed_pages:
+                self.view.window().show_quick_panel(packed_pages, self.on_done_pages)
+            else:
+                sublime.error_message("No result found for {}".format(self.page_title))
+        else:
+            print(response.text)
+            sublime.error_message("Can not get pages, reason: {}".format(response.reason))
 
     def on_done_pages(self, idx):
         if idx == -1:
@@ -325,8 +350,8 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
             sublime.set_clipboard(content_uri)
             sublime.status_message(self.MSG_SUCCESS)
         else:
-            print("Can not get content.")
             print(response.text)
+            sublime.error_message("Can not get content, reason: {}".format(response.reason))
 
 
 class UpdateConfluencePageCommand(BaseConfluencePageCommand):
@@ -380,8 +405,9 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
             sublime.status_message(self.MSG_SUCCESS)
             if response.ok:
                 self.view.settings().set("confluence_content", response.json())
-        except Exception as error:
-            sublime.error_message(error)
+        except Exception:
+            print(response.text)
+            sublime.error_message("Can not update content, reason: {}".format(response.reason))
 
 
 class DeleteConfluencePageCommand(BaseConfluencePageCommand):
@@ -404,7 +430,8 @@ class DeleteConfluencePageCommand(BaseConfluencePageCommand):
             if response.ok:
                 sublime.status_message(self.MSG_SUCCESS)
             else:
-                print("Can not delete content.")
                 print(response.text)
-        except Exception as error:
-            sublime.error_message(error)
+                sublime.error_message("Can't delete content, reason: {}".format(response.reason))
+        except Exception:
+            print(response.text)
+            sublime.error_message("Can't delete content, reason: {}".format(response.reason))
