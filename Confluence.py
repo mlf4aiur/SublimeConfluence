@@ -91,6 +91,7 @@ class Markup(object):
         self.markups = dict([
             ("Markdown", self.markdown_to_html),
             ("Markdown Extended", self.markdown_to_html),
+            ("Markdown (Standard)", self.markdown_to_html),
             ("reStructuredText", self.rst_to_html)])
 
     def markdown_to_html(self, content):
@@ -226,6 +227,8 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
 
 
 class PostConfluencePageCommand(BaseConfluencePageCommand):
+    MSG_SUCCESS = "Content created and the url copied to the clipboard."
+
     def run(self, edit):
         super(PostConfluencePageCommand, self).run(edit)
         self.post()
@@ -250,7 +253,16 @@ class PostConfluencePageCommand(BaseConfluencePageCommand):
             body = dict(storage=dict(value=new_content, representation="storage"))
             data = dict(type="page", title=meta["title"], ancestors=[dict(id=ancestor_id)],
                         space=space, body=body)
-            self.confluence_api.create_content(data)
+            result = self.confluence_api.create_content(data)
+            if result.ok:
+                self.view.settings().set("confluence_content", result.json())
+                # copy content url
+                content_uri = self.confluence_api.get_content_uri(result.json())
+                sublime.set_clipboard(content_uri)
+                sublime.status_message(self.MSG_SUCCESS)
+            else:
+                print(result.text)
+                sublime.error_message("Can not create content, reason: {}".format(result.reason))
         else:
             print(response.text)
             sublime.error_message("Can not get ancestor, reason: {}".format(response.reason))
