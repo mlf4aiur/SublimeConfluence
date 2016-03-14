@@ -43,6 +43,10 @@ If the password unset, then you need to input the password every time, and don't
 Usage
 -----
 
+**Demo:**
+
+![demo](demo.gif)
+
 **Post page to Confluence**
 
 Supported markup languages:
