@@ -148,6 +148,7 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
     MSG_USERNAME = "Confluence username:"
     MSG_PASSWORD = "Confluence password:"
     hidden_string = ""
+    callback = None
 
     def run(self, edit):
         self.edit = edit
@@ -157,7 +158,7 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
         self.password = settings.get("password") if settings.get("password") else ""
         self.default_space_key = settings.get("default_space_key")
 
-    def build_confluence_api(self):
+    def get_credential(self):
         if not self.username and not self.password:
             sublime.status_message("Waiting for username")
             sublime.set_timeout(self.get_username_password, 50)
@@ -167,7 +168,11 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
         elif not self.password:
             sublime.status_message("Waiting for password")
             sublime.set_timeout(self.get_password, 50)
-        self.confluence_api = ConfluenceApi(self.username, self.password, self.base_uri)
+        else:
+            callback = self.callback
+            if callback:
+                self.callback = None
+                sublime.set_timeout(callback, 50)
 
     def get_username_password(self):
         self.view.window().show_input_panel(
@@ -188,12 +193,13 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
 
     def on_done_username(self, value):
         self.username = value
+        sublime.set_timeout(self.get_confluence_api, 50)
 
     def on_done_password(self, value):
-        if not self.password.strip():
-            sublime.status_message("No password provided")
-        else:
-            self.password = value
+        callback = self.callback
+        if callback:
+            self.callback = None
+            sublime.set_timeout(callback, 50)
 
     def parse_input_password(self, input_password):
         length = len(input_password)
@@ -218,7 +224,9 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
                 password = self.password[:length]
                 self.password = password[:position - 1] + character + password[position:]
             else:
-                self.password = self.password + value.replace("*", "")
+                (length, character, position) = self.parse_input_password(value)
+                password = self.password
+                self.password = password[:position - 1] + character + password[position - 1:]
             self.hidden_string = "*" * len(value)
             self.view.window().run_command("hide_panel", {"cancel": False})
             self.view.window().show_input_panel(
@@ -231,7 +239,8 @@ class PostConfluencePageCommand(BaseConfluencePageCommand):
 
     def run(self, edit):
         super(PostConfluencePageCommand, self).run(edit)
-        self.post()
+        self.callback = self.post
+        sublime.set_timeout(self.get_credential, 50)
 
     def post(self):
         region = sublime.Region(0, self.view.size())
@@ -242,14 +251,13 @@ class PostConfluencePageCommand(BaseConfluencePageCommand):
         new_content = markup.to_html("\n".join(content), syntax)
         if not new_content:
             return
-        self.build_confluence_api()
+        self.confluence_api = ConfluenceApi(self.username, self.password, self.base_uri)
         response = self.confluence_api.get_content_by_title(
             meta["space_key"], meta["ancestor_title"])
         if response.ok:
             ancestor = response.json()["results"][0]
             ancestor_id = int(ancestor["id"])
             space = dict(key=meta["space_key"])
-            new_content = "<p>This is a new page</p>"
             body = dict(storage=dict(value=new_content, representation="storage"))
             data = dict(type="page", title=meta["title"], ancestors=[dict(id=ancestor_id)],
                         space=space, body=body)
@@ -277,46 +285,33 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
 
     def run(self, edit):
         super(GetConfluencePageCommand, self).run(edit)
-        self.build_confluence_api()
-        sublime.status_message("Waiting for page title")
-        sublime.set_timeout(self.get_space_key_and_page_title, 50)
+        self.callback = self.get_space_key_and_page_title
+        sublime.set_timeout(self.get_credential, 50)
 
     def get_space_key_and_page_title(self):
         if self.all_space:
             self.space = None
-            sublime.status_message("Waiting for page title")
             sublime.set_timeout(self.get_page_title, 50)
         elif self.specific_space_key:
-            sublime.status_message("Waiting for space key")
             sublime.set_timeout(self.get_space_key, 50)
         elif not self.default_space_key:
-            sublime.status_message("Waiting for space key")
             sublime.set_timeout(self.get_space_key, 50)
         else:
             self.space_key = self.default_space_key
-            sublime.status_message("Waiting for page title")
             sublime.set_timeout(self.get_page_title, 50)
 
-    def on_done_password(self, value):
-        print("on_done_password")
-        super(GetConfluencePageCommand, self).on_done_password(value)
-        if not self.password.strip():
-            sublime.status_message("No password provided")
-        else:
-            self.password = value
-            sublime.set_timeout(self.get_space_key_and_page_title, 50)
-
     def get_space_key(self):
+        sublime.status_message("Waiting for space key")
         self.view.window().show_input_panel(
             self.MSG_SPACE_KEY, "", self.on_done_space_key, None, None)
 
     def get_page_title(self):
+        sublime.status_message("Waiting for page title")
         self.view.window().show_input_panel(
             self.MSG_SEARCH_PAGE, "", self.on_done_page_title, None, None)
 
     def on_done_space_key(self, value):
         self.space_key = value
-        sublime.status_message("Waiting for page title")
         sublime.set_timeout(self.get_page_title, 50)
 
     def on_done_page_title(self, value):
@@ -324,6 +319,7 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
         sublime.set_timeout(self.get_pages, 50)
 
     def get_pages(self):
+        self.confluence_api = ConfluenceApi(self.username, self.password, self.base_uri)
         response = self.confluence_api.search_content(self.space_key, self.page_title)
         if response.ok:
             self.pages = response.json()["results"]
@@ -376,8 +372,8 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
             sublime.error_message(
                 "Can't update: this doesn't appear to be a valid Confluence page.")
             return
-        self.build_confluence_api()
-        self.update()
+        self.callback = self.update
+        sublime.set_timeout(self.get_credential, 50)
 
     def update(self):
         # Example Data:
@@ -404,22 +400,35 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
         title = self.content["title"]
         space_key = self.content["space"]["key"]
         version_number = self.content["version"]["number"] + 1
-        body_value = self.view.substr(sublime.Region(0, self.view.size()))
+        region = sublime.Region(0, self.view.size())
+        contents = self.view.substr(region)
+        syntax = self.view.settings().get("syntax")
+        if syntax == "Packages/HTML/HTML.sublime-syntax":
+            new_content = "".join(contents.split("\n"))
+        else:
+            markup = Markup()
+            meta, content = markup.get_meta_and_content(contents)
+            new_content = markup.to_html("\n".join(content), syntax)
+
         space = dict(key=space_key)
         version = dict(number=version_number, minorEdit=False)
-        body = dict(storage=dict(value=body_value, representation="storage"))
+        body = dict(storage=dict(value=new_content, representation="storage"))
         data = dict(id=content_id, type="page", title=title,
                     space=space, version=version, body=body)
         try:
+            self.confluence_api = ConfluenceApi(self.username, self.password, self.base_uri)
             response = self.confluence_api.update_content(content_id, data)
             content_uri = self.confluence_api.get_content_uri(self.content)
             sublime.set_clipboard(content_uri)
             sublime.status_message(self.MSG_SUCCESS)
             if response.ok:
                 self.view.settings().set("confluence_content", response.json())
+            else:
+                print(response.text)
+                sublime.error_message("Can't update content, reason: {}".format(response.reason))
         except Exception:
             print(response.text)
-            sublime.error_message("Can not update content, reason: {}".format(response.reason))
+            sublime.error_message("Can't update content, reason: {}".format(response.reason))
 
 
 class DeleteConfluencePageCommand(BaseConfluencePageCommand):
@@ -432,12 +441,13 @@ class DeleteConfluencePageCommand(BaseConfluencePageCommand):
             sublime.error_message(
                 "Can't update: this doesn't appear to be a valid Confluence page.")
             return
-        self.build_confluence_api()
-        self.delete()
+        self.callback = self.delete
+        sublime.set_timeout(self.get_credential, 50)
 
     def delete(self):
         content_id = str(self.content["id"])
         try:
+            self.confluence_api = ConfluenceApi(self.username, self.password, self.base_uri)
             response = self.confluence_api.delete_content(content_id)
             if response.ok:
                 sublime.status_message(self.MSG_SUCCESS)
