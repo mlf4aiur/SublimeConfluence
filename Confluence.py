@@ -403,7 +403,7 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
         region = sublime.Region(0, self.view.size())
         contents = self.view.substr(region)
         syntax = self.view.settings().get("syntax")
-        if syntax == "Packages/HTML/HTML.sublime-syntax":
+        if "HTML" in syntax:
             new_content = "".join(contents.split("\n"))
         else:
             markup = Markup()
