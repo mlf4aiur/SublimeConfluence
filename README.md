@@ -69,7 +69,7 @@ Use Command Palette to run it, use `cmd+shift+p` then `Post page to Confluence` 
 BTW
 ---
 
-Confluence support buildin markup(Textile like) and markdown syntax insert. On the Confluence edit mode, press command + shift + D, to insert markup text.
+Confluence supports buildin markup(Textile like) and markdown syntax insert. On the Confluence edit mode, press command + shift + D, to insert markup text.
 
 License
 -------
