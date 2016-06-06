@@ -368,14 +368,13 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
     def run(self, edit):
         super(UpdateConfluencePageCommand, self).run(edit)
         self.content = self.view.settings().get("confluence_content")
-        if not self.content:
-            sublime.error_message(
-                "Can't update: this doesn't appear to be a valid Confluence page.")
-            return
-        self.callback = self.update
+        if self.content:
+            self.callback = self.update_from_editor
+        else:
+            self.callback = self.update_from_source
         sublime.set_timeout(self.get_credential, 50)
 
-    def update(self):
+    def update_from_editor(self):
         # Example Data:
         """
         {
@@ -418,10 +417,10 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
         try:
             self.confluence_api = ConfluenceApi(self.username, self.password, self.base_uri)
             response = self.confluence_api.update_content(content_id, data)
-            content_uri = self.confluence_api.get_content_uri(self.content)
-            sublime.set_clipboard(content_uri)
-            sublime.status_message(self.MSG_SUCCESS)
             if response.ok:
+                content_uri = self.confluence_api.get_content_uri(self.content)
+                sublime.set_clipboard(content_uri)
+                sublime.status_message(self.MSG_SUCCESS)
                 self.view.settings().set("confluence_content", response.json())
             else:
                 print(response.text)
@@ -429,6 +428,54 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
         except Exception:
             print(response.text)
             sublime.error_message("Can't update content, reason: {}".format(response.reason))
+
+    def update_from_source(self):
+        region = sublime.Region(0, self.view.size())
+        contents = self.view.substr(region)
+        markup = Markup()
+        meta, content = markup.get_meta_and_content(contents)
+        syntax = self.view.settings().get("syntax")
+        new_content = markup.to_html("\n".join(content), syntax)
+        if not new_content:
+            sublime.error_message(
+                "Can't update: this doesn't appear to be a valid Confluence page.")
+            return
+        self.confluence_api = ConfluenceApi(self.username, self.password, self.base_uri)
+
+        get_content_by_title_resp = self.confluence_api.get_content_by_title(
+            meta["space_key"], meta["title"])
+        if get_content_by_title_resp.ok:
+            content_id = get_content_by_title_resp.json()["results"][0]["id"]
+
+            get_content_by_id_resp = self.confluence_api.get_content_by_id(content_id)
+            if get_content_by_id_resp.ok:
+                content = get_content_by_id_resp.json()
+                space = dict(key=meta["space_key"])
+                version_number = content["version"]["number"] + 1
+                version = dict(number=version_number, minorEdit=False)
+                # ancestor_id = int(ancestor["id"])
+                body = dict(storage=dict(value=new_content, representation="storage"))
+                data = dict(id=content_id, type="page", title=meta["title"],
+                            space=space, version=version, body=body)
+
+                update_content_resp = self.confluence_api.update_content(content_id, data)
+                if update_content_resp.ok:
+                    self.view.settings().set("confluence_content", update_content_resp.json())
+                    content_uri = self.confluence_api.get_content_uri(update_content_resp.json())
+                    sublime.set_clipboard(content_uri)
+                    sublime.status_message(self.MSG_SUCCESS)
+                else:
+                    print(update_content_resp.text)
+                    sublime.error_message("Can not update content, reason: {}".format(
+                        update_content_resp.reason))
+            else:
+                print(get_content_by_id_resp.text)
+                sublime.error_message("Can not get content by id, reason: {}".format(
+                    get_content_by_id_resp.reason))
+        else:
+            print(get_content_by_title_resp.text)
+            sublime.error_message("Can not get content by title, reason: {}".format(
+                get_content_by_title_resp.reason))
 
 
 class DeleteConfluencePageCommand(BaseConfluencePageCommand):
