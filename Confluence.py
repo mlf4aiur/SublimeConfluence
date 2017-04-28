@@ -13,6 +13,7 @@ try:
 except ImportError:
     HTML_PRETTIFY = False
 
+
 abspath = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(abspath)
 import markdown2
@@ -347,11 +348,15 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
             new_view = self.view.window().new_file()
             # set syntax file
             new_view.set_syntax_file("Packages/HTML/HTML.sublime-syntax")
+            new_view.settings().set("auto_indent", False)
 
             # insert the page
-            new_view.run_command("insert_text", {"text": body})
+            new_view.run_command("insert", {"characters": body})
             new_view.set_name(content["title"])
             new_view.settings().set("confluence_content", content)
+            new_view.settings().set("auto_indent", True)
+            new_view.run_command("reindent", {"single_line": False})
+            new_view.run_command("expand_tabs", {"set_translate_tabs": True})
 
             # copy content url
             content_uri = self.confluence_api.get_content_uri(content)
