@@ -35,6 +35,9 @@ class ConfluenceApi(object):
         headers = {"Content-Type": "application/json"}
         if params:
             kwargs.update(params=params)
+        # Ensure we are authenticated (set cookie, session, etc.)
+        self.session.request("get", self.base_uri) 
+        # Make the "real" call
         response = self.session.request(
             method, url, headers=headers, verify=False, **kwargs)
         return response
