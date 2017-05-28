@@ -58,7 +58,7 @@ class ConfluenceApi(object):
         return self._post("content/", data=content_data)
 
     def search_content(self, space_key, title):
-        cql = "type=page AND space={} AND title~\"{}\"".format(space_key, title)
+        cql = "type=page AND space=\"{}\" AND title~\"{}\"".format(space_key, title)
         params = {"cql": cql}
         response = self._get("content/search", params=params)
         return response
@@ -69,7 +69,7 @@ class ConfluenceApi(object):
         return response
 
     def get_content_by_title(self, space_key, title):
-        cql = "type=page AND space={} AND title=\"{}\"".format(space_key, title)
+        cql = "type=page AND space=\"{}\" AND title=\"{}\"".format(space_key, title)
         params = {"cql": cql}
         response = self._get("content/search", params=params)
         return response
