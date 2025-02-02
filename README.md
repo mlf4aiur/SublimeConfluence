@@ -77,4 +77,4 @@ License
 SublimeConfluence is [BSD Licensed](https://github.com/mlf4aiur/sublimetext-confluence-markup/master/LICENSE).
 
 [0]: https://github.com/trentm/python-markdown2
-[1]: http://wbond.net/sublime_packages/package_control
+[1]: https://packagecontrol.io
