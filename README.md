@@ -1,18 +1,16 @@
-SublimeConfluence
-=================
+# SublimeConfluence
 
-Sublime Text 3 plugin for integrate with Atlassian Confluence
+Sublime Text plugin for integrating with Atlassian Confluence
 
-Installation
-------------
+## Installation
 
-**Use sublime package manager**
+### Use sublime package manager
 
- - you should use [sublime package manager][1]
- - use `cmd+shift+p` then `Package Control: Install Package`
- - look for `Confluence` and install it.
+- you should use [sublime package manager][1]
+- use `cmd+shift+p` then `Package Control: Install Package`
+- look for `Confluence` and install it.
 
-**Manually**
+### Manually
 
 At the moment Git is required to install the plugin.  You will need
 to clone the repository in your Sublime Text "Packages" directory:
@@ -21,11 +19,29 @@ to clone the repository in your Sublime Text "Packages" directory:
 
 The "Packages" directory is located at:
 
-* OS X: `~/Library/Application Support/Sublime Text */Packages/`
-* Linux: `~/.Sublime Text */Packages/`
-* Windows: `%APPDATA%/Sublime Text */Packages/`
+- OS X: `~/Library/Application Support/Sublime Text */Packages/`
+- Linux: `~/.Sublime Text */Packages/`
+- Windows: `%APPDATA%/Sublime Text */Packages/`
 
-**Settings**
+### Development
+
+Use [uv](https://docs.astral.sh/uv/) to set up the dependencies for local
+development:
+
+```sh
+uv sync
+```
+
+To enable reStructuredText support, install its optional dependency:
+
+```sh
+uv sync --extra rst
+```
+
+This development environment does not replace Package Control's dependency
+installation for Sublime Text.
+
+### Settings
 
 Add the following to your User Settings file:
 
@@ -34,45 +50,58 @@ Add the following to your User Settings file:
     "base_uri": "https://confluence.example.com/confluence/rest/api",
     "default_space_key": "ENG",
     "username": "username",
-    "password": "password"
+    "password": "password",
+    "verify_ssl": true
 }
 ```
 
-If the password unset, then you need to input the password every time, and don't edit the password inline this plugin can not handle it properly.
+`verify_ssl` accepts either the boolean `true` (the default) or a quoted path
+to a PEM CA bundle. For example:
 
-Usage
------
+```json
+"verify_ssl": "/etc/ssl/certs/company-ca-bundle.pem"
+```
 
-**Demo:**
+On Windows, escape backslashes in the path, for example
+`"verify_ssl": "C:\\Certificates\\company-ca-bundle.pem"`. Disabling
+certificate verification is not recommended.
+
+If the password is unset, you need to input it every time. Avoid editing the
+password inline; this plugin cannot handle that correctly.
+
+## Usage
+
+### Demo
 
 ![demo](demo.gif)
 
-**Post page to Confluence**
+### Post page to Confluence
 
 Supported markup languages:
 
-* Markdown, depends on [python-markdown2][0]
-* reStructuredText, depends on docutils
+- Markdown, depends on [python-markdown2][0]
+- reStructuredText, depends on docutils
 
-META data must be given, and put it on the head of document, use newline to separate META data and content.
+META data must be at the head of the document, separated from the content by a
+newline.
 
 Example files: example.md, example.rst.
 
 META data:
 
-* Space
-* Ancestor Title
-* Title
+- Space
+- Ancestor Title
+- Title
 
-Use Command Palette to run it, use `cmd+shift+p` then `Post page to Confluence` to post local page to remote.
+Use the Command Palette to run it: press `cmd+shift+p`, then choose
+`Post page to Confluence` to post the local page remotely.
 
-BTW
----
+## BTW
 
-Confluence supports buildin markup(Textile like) and markdown syntax insert. On the Confluence edit mode, press command + shift + D, to insert markup text.
+Confluence supports built-in markup (Textile-like) and Markdown syntax insertion.
+In Confluence edit mode, press `command+shift+D` to insert markup text.
 
-License
--------
+## License
 
 SublimeConfluence is [BSD Licensed](https://github.com/mlf4aiur/sublimetext-confluence-markup/master/LICENSE).
 
