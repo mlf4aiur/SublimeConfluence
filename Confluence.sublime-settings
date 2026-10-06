@@ -20,5 +20,13 @@
     /*
         Sets the Confluence password
     */
-    "password": null
+    "password": null,
+
+    /*
+        Verifies TLS certificates. Set to a CA bundle path to use a custom
+        certificate authority, for example:
+        "verify_ssl": "/path/to/company-ca-bundle.pem"
+        Disabling verification is not recommended.
+    */
+    "verify_ssl": true
 }
