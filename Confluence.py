@@ -1,7 +1,5 @@
 import json
 import re
-import sys
-from pathlib import Path
 
 import requests
 import sublime
@@ -14,8 +12,7 @@ except ImportError:
     HTML_PRETTIFY = False
 
 
-sys.path.append(str(Path(__file__).resolve().parent))
-import markdown2
+from . import markdown2
 
 
 class ConfluenceApi:
