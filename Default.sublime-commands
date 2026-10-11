@@ -14,5 +14,10 @@
     {
         "caption": "Confluence: Delete Confluence Page",
         "command": "delete_confluence_page"
+    },
+    {
+        "caption": "Preferences: Confluence Settings",
+        "command": "edit_settings",
+        "args": {"base_file": "${packages}/Confluence/Confluence.sublime-settings"}
     }
 ]
