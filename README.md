@@ -2,6 +2,8 @@
 
 Sublime Text plugin for integrating with Atlassian Confluence
 
+Requires Sublime Text build 4215 or newer (Python 3.14 plugin host).
+
 ## Installation
 
 ### Use sublime package manager
