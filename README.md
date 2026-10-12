@@ -43,9 +43,18 @@ uv sync --extra rst
 This development environment does not replace Package Control's dependency
 installation for Sublime Text.
 
+Package Control does not resolve transitive library dependencies like pip or
+uv. `dependencies.json` explicitly lists Requests and its required libraries;
+Sublime Text supplies `certifi` in the plugin host.
+
 ### Settings
 
-Add the following to your User Settings file:
+Open `Preferences: Confluence Settings` from the Command Palette, or use
+`Preferences > Package Settings > Confluence > Settings`. The default settings
+open on the left and your editable user settings open on the right. If no user
+settings file exists, the command creates an empty settings buffer.
+
+Add the following to the user settings on the right and save:
 
 ```json
 {
@@ -70,6 +79,13 @@ certificate verification is not recommended.
 
 If the password is unset, you need to input it every time. Avoid editing the
 password inline; this plugin cannot handle that correctly.
+
+### Missing libraries after upgrading
+
+If the console reports `ModuleNotFoundError: No module named 'urllib3'`, update
+Confluence, then run `Package Control: Satisfy Libraries` from the Command
+Palette and restart Sublime Text. This installs any missing declared libraries
+into Sublime Text's Python environment.
 
 ## Usage
 

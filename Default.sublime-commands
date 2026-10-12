@@ -18,6 +18,9 @@
     {
         "caption": "Preferences: Confluence Settings",
         "command": "edit_settings",
-        "args": {"base_file": "${packages}/Confluence/Confluence.sublime-settings"}
+        "args": {
+            "base_file": "${packages}/Confluence/Confluence.sublime-settings",
+            "default": "{\n\t$0\n}\n"
+        }
     }
 ]
