@@ -7,16 +7,16 @@ import sublime_plugin
 
 try:
     import lxml.html
+
     HTML_PRETTIFY = True
 except ImportError:
     HTML_PRETTIFY = False
 
 
-from . import markdown2
+from .vendor import markdown2
 
 
 class ConfluenceApi:
-
     def __init__(self, username, password, base_uri, *, verify_ssl=True):
         self.username = username
         self.password = password
@@ -24,8 +24,11 @@ class ConfluenceApi:
         self.session = requests.Session()
         self.session.verify = verify_ssl
         self.session.auth = requests.auth.HTTPBasicAuth(self.username, self.password)
-        print("ConfluenceApi username: {}, password: {}, base_uri: {}".format(
-            self.username, "*" * len(self.password), self.base_uri))
+        print(
+            "ConfluenceApi username: {}, password: {}, base_uri: {}".format(
+                self.username, "*" * len(self.password), self.base_uri,
+            ),
+        )
 
     def _request(self, method, sub_uri, params=None, **kwargs):
         url = f"{self.base_uri}/{sub_uri}"
@@ -35,8 +38,7 @@ class ConfluenceApi:
         # Ensure we are authenticated (set cookie, session, etc.)
         self.session.request("get", self.base_uri)
         # Make the "real" call
-        response = self.session.request(
-            method, url, headers=headers, **kwargs)
+        response = self.session.request(method, url, headers=headers, **kwargs)
         return response
 
     def _post(self, url, data=None):
@@ -61,8 +63,7 @@ class ConfluenceApi:
         return response
 
     def get_content_by_id(self, content_id):
-        response = self._get(
-            f"content/{content_id}?expand=body.storage,version,space")
+        response = self._get(f"content/{content_id}?expand=body.storage,version,space")
         return response
 
     def get_content_by_title(self, space_key, title):
@@ -80,8 +81,7 @@ class ConfluenceApi:
         return f"{base}{webui}"
 
     def update_content(self, content_id, content_data):
-        return self._put(f"content/{content_id}",
-                         data=content_data)
+        return self._put(f"content/{content_id}", data=content_data)
 
     def delete_content(self, content_id):
         return self._delete(f"content/{content_id}")
@@ -89,19 +89,27 @@ class ConfluenceApi:
 
 class Markup:
     def __init__(self):
-        self.markups = {"Markdown": self.markdown_to_html,
+        self.markups = {
+            "Markdown": self.markdown_to_html,
             "Markdown Extended": self.markdown_to_html,
             "Markdown (Standard)": self.markdown_to_html,
-            "reStructuredText": self.rst_to_html}
+            "reStructuredText": self.rst_to_html,
+        }
 
     def markdown_to_html(self, content):
-        return markdown2.markdown(
-            content, extras=["tables", "fenced-code-blocks", "strike"],
-        ).encode("utf-8").decode()
+        return (
+            markdown2.markdown(
+                content,
+                extras=["tables", "fenced-code-blocks", "strike"],
+            )
+            .encode("utf-8")
+            .decode()
+        )
 
     def rst_to_html(self, content):
         try:
             from docutils.core import publish_string  # noqa: PLC0415
+
             return publish_string(content, writer_name="html")
         except ImportError:
             error_msg = """
@@ -120,8 +128,7 @@ class Markup:
         converter = self.markups[syntax]
         new_content = converter(content)
         if not new_content:
-            sublime.error_message(
-                "Can not parse this document.")
+            sublime.error_message("Can not parse this document.")
         return new_content
 
     def get_meta_and_content(self, contents):
@@ -137,7 +144,7 @@ class Markup:
                 elif re.match(r"[Tt]itle: *", entry):
                     meta["title"] = re.sub("[^:]*: *", "", entry)
             else:
-                content = tmp[x + 1:]
+                content = tmp[x + 1 :]
                 break
         return (meta, content)
 
@@ -177,15 +184,18 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
 
     def get_username_password(self):
         self.view.window().show_input_panel(
-            self.MSG_USERNAME, "", self.on_done_username_password, None, None)
+            self.MSG_USERNAME, "", self.on_done_username_password, None, None,
+        )
 
     def get_username(self):
         self.view.window().show_input_panel(
-            self.MSG_USERNAME, "", self.on_done_username, None, None)
+            self.MSG_USERNAME, "", self.on_done_username, None, None,
+        )
 
     def get_password(self):
         self.view.window().show_input_panel(
-            self.MSG_PASSWORD, "", self.on_done_password, self.on_change_password, None)
+            self.MSG_PASSWORD, "", self.on_done_password, self.on_change_password, None,
+        )
 
     def on_done_username_password(self, value):
         self.username = value
@@ -219,20 +229,28 @@ class BaseConfluencePageCommand(sublime_plugin.TextCommand):
         # It can not get correct password when user modify the password inline
         if value != self.hidden_string:
             if len(value) < len(self.password):
-                self.password = self.password[:len(value)]
+                self.password = self.password[: len(value)]
             elif len(value) == len(self.password):
                 (length, character, position) = self.parse_input_password(value)
                 password = self.password[:length]
-                self.password = password[:position - 1] + character + password[position:]
+                self.password = (
+                    password[: position - 1] + character + password[position:]
+                )
             else:
                 (length, character, position) = self.parse_input_password(value)
                 password = self.password
-                self.password = password[:position - 1] + character + password[position - 1:]
+                self.password = (
+                    password[: position - 1] + character + password[position - 1 :]
+                )
             self.hidden_string = "*" * len(value)
             self.view.window().run_command("hide_panel", {"cancel": False})
             self.view.window().show_input_panel(
-                self.MSG_PASSWORD, self.hidden_string, self.on_done_password,
-                self.on_change_password, None)
+                self.MSG_PASSWORD,
+                self.hidden_string,
+                self.on_done_password,
+                self.on_change_password,
+                None,
+            )
 
 
 class PostConfluencePageCommand(BaseConfluencePageCommand):
@@ -253,17 +271,23 @@ class PostConfluencePageCommand(BaseConfluencePageCommand):
         if not new_content:
             return
         self.confluence_api = ConfluenceApi(
-            self.username, self.password, self.base_uri,
-            verify_ssl=self.verify_ssl)
+            self.username, self.password, self.base_uri, verify_ssl=self.verify_ssl,
+        )
         response = self.confluence_api.get_content_by_title(
-            meta["space_key"], meta["ancestor_title"])
+            meta["space_key"], meta["ancestor_title"],
+        )
         if response.ok:
             ancestor = response.json()["results"][0]
             ancestor_id = int(ancestor["id"])
             space = {"key": meta["space_key"]}
             body = {"storage": {"value": new_content, "representation": "storage"}}
-            data = {"type": "page", "title": meta["title"], "ancestors": [{"id": ancestor_id}],
-                        "space": space, "body": body}
+            data = {
+                "type": "page",
+                "title": meta["title"],
+                "ancestors": [{"id": ancestor_id}],
+                "space": space,
+                "body": body,
+            }
             result = self.confluence_api.create_content(data)
             if result.ok:
                 self.view.settings().set("confluence_content", result.json())
@@ -273,7 +297,9 @@ class PostConfluencePageCommand(BaseConfluencePageCommand):
                 sublime.status_message(self.MSG_SUCCESS)
             else:
                 print(result.text)
-                sublime.error_message(f"Can not create content, reason: {result.reason}")
+                sublime.error_message(
+                    f"Can not create content, reason: {result.reason}",
+                )
         else:
             print(response.text)
             sublime.error_message(f"Can not get ancestor, reason: {response.reason}")
@@ -304,12 +330,14 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
     def get_space_key(self):
         sublime.status_message("Waiting for space key")
         self.view.window().show_input_panel(
-            self.MSG_SPACE_KEY, "", self.on_done_space_key, None, None)
+            self.MSG_SPACE_KEY, "", self.on_done_space_key, None, None,
+        )
 
     def get_page_title(self):
         sublime.status_message("Waiting for page title")
         self.view.window().show_input_panel(
-            self.MSG_SEARCH_PAGE, "", self.on_done_page_title, None, None)
+            self.MSG_SEARCH_PAGE, "", self.on_done_page_title, None, None,
+        )
 
     def on_done_space_key(self, value):
         self.space_key = value
@@ -321,8 +349,8 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
 
     def get_pages(self):
         self.confluence_api = ConfluenceApi(
-            self.username, self.password, self.base_uri,
-            verify_ssl=self.verify_ssl)
+            self.username, self.password, self.base_uri, verify_ssl=self.verify_ssl,
+        )
         response = self.confluence_api.search_content(self.space_key, self.page_title)
         if response.ok:
             self.pages = response.json()["results"]
@@ -345,7 +373,9 @@ class GetConfluencePageCommand(BaseConfluencePageCommand):
             body = content["body"]["storage"]["value"]
             if HTML_PRETTIFY:
                 document_root = lxml.html.fromstring(body)
-                body = (lxml.etree.tostring(document_root, encoding="unicode", pretty_print=True))
+                body = lxml.etree.tostring(
+                    document_root, encoding="unicode", pretty_print=True,
+                )
 
             new_view = self.view.window().new_file()
             # set syntax file
@@ -399,12 +429,18 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
         space = {"key": space_key}
         version = {"number": version_number, "minorEdit": False}
         body = {"storage": {"value": new_content, "representation": "storage"}}
-        data = {"id": content_id, "type": "page", "title": title,
-                    "space": space, "version": version, "body": body}
+        data = {
+            "id": content_id,
+            "type": "page",
+            "title": title,
+            "space": space,
+            "version": version,
+            "body": body,
+        }
         try:
             self.confluence_api = ConfluenceApi(
-                self.username, self.password, self.base_uri,
-                verify_ssl=self.verify_ssl)
+                self.username, self.password, self.base_uri, verify_ssl=self.verify_ssl,
+            )
             response = self.confluence_api.update_content(content_id, data)
             if response.ok:
                 content_uri = self.confluence_api.get_content_uri(self.content)
@@ -413,7 +449,9 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
                 self.view.settings().set("confluence_content", response.json())
             else:
                 print(response.text)
-                sublime.error_message(f"Can't update content, reason: {response.reason}")
+                sublime.error_message(
+                    f"Can't update content, reason: {response.reason}",
+                )
         except requests.exceptions.RequestException as error:
             sublime.error_message(f"Can't update content: {error}")
 
@@ -426,14 +464,16 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
         new_content = markup.to_html("\n".join(content), syntax)
         if not new_content:
             sublime.error_message(
-                "Can't update: this doesn't appear to be a valid Confluence page.")
+                "Can't update: this doesn't appear to be a valid Confluence page.",
+            )
             return
         self.confluence_api = ConfluenceApi(
-            self.username, self.password, self.base_uri,
-            verify_ssl=self.verify_ssl)
+            self.username, self.password, self.base_uri, verify_ssl=self.verify_ssl,
+        )
 
         get_content_by_title_resp = self.confluence_api.get_content_by_title(
-            meta["space_key"], meta["title"])
+            meta["space_key"], meta["title"],
+        )
         if get_content_by_title_resp.ok:
             content_id = get_content_by_title_resp.json()["results"][0]["id"]
 
@@ -445,24 +485,42 @@ class UpdateConfluencePageCommand(BaseConfluencePageCommand):
                 version = {"number": version_number, "minorEdit": False}
                 # ancestor_id = int(ancestor["id"])
                 body = {"storage": {"value": new_content, "representation": "storage"}}
-                data = {"id": content_id, "type": "page", "title": meta["title"],
-                            "space": space, "version": version, "body": body}
+                data = {
+                    "id": content_id,
+                    "type": "page",
+                    "title": meta["title"],
+                    "space": space,
+                    "version": version,
+                    "body": body,
+                }
 
-                update_content_resp = self.confluence_api.update_content(content_id, data)
+                update_content_resp = self.confluence_api.update_content(
+                    content_id, data,
+                )
                 if update_content_resp.ok:
-                    self.view.settings().set("confluence_content", update_content_resp.json())
-                    content_uri = self.confluence_api.get_content_uri(update_content_resp.json())
+                    self.view.settings().set(
+                        "confluence_content", update_content_resp.json(),
+                    )
+                    content_uri = self.confluence_api.get_content_uri(
+                        update_content_resp.json(),
+                    )
                     sublime.set_clipboard(content_uri)
                     sublime.status_message(self.MSG_SUCCESS)
                 else:
                     print(update_content_resp.text)
-                    sublime.error_message(f"Can not update content, reason: {update_content_resp.reason}")
+                    sublime.error_message(
+                        f"Can not update content, reason: {update_content_resp.reason}",
+                    )
             else:
                 print(get_content_by_id_resp.text)
-                sublime.error_message(f"Can not get content by id, reason: {get_content_by_id_resp.reason}")
+                sublime.error_message(
+                    f"Can not get content by id, reason: {get_content_by_id_resp.reason}",
+                )
         else:
             print(get_content_by_title_resp.text)
-            sublime.error_message(f"Can not get content by title, reason: {get_content_by_title_resp.reason}")
+            sublime.error_message(
+                f"Can not get content by title, reason: {get_content_by_title_resp.reason}",
+            )
 
 
 class DeleteConfluencePageCommand(BaseConfluencePageCommand):
@@ -473,7 +531,8 @@ class DeleteConfluencePageCommand(BaseConfluencePageCommand):
         self.content = self.view.settings().get("confluence_content")
         if not self.content:
             sublime.error_message(
-                "Can't update: this doesn't appear to be a valid Confluence page.")
+                "Can't update: this doesn't appear to be a valid Confluence page.",
+            )
             return
         self.callback = self.delete
         sublime.set_timeout(self.get_credential, 50)
@@ -482,13 +541,15 @@ class DeleteConfluencePageCommand(BaseConfluencePageCommand):
         content_id = str(self.content["id"])
         try:
             self.confluence_api = ConfluenceApi(
-                self.username, self.password, self.base_uri,
-                verify_ssl=self.verify_ssl)
+                self.username, self.password, self.base_uri, verify_ssl=self.verify_ssl,
+            )
             response = self.confluence_api.delete_content(content_id)
             if response.ok:
                 sublime.status_message(self.MSG_SUCCESS)
             else:
                 print(response.text)
-                sublime.error_message(f"Can't delete content, reason: {response.reason}")
+                sublime.error_message(
+                    f"Can't delete content, reason: {response.reason}",
+                )
         except requests.exceptions.RequestException as error:
             sublime.error_message(f"Can't delete content: {error}")
